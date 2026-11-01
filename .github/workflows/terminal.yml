@@ -1,0 +1,30 @@
+name: terminal
+run-name: job
+on:
+  workflow_dispatch:
+    inputs:
+      payload: { required: true, type: string }
+permissions: { contents: read }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: decrypt
+        run: node decrypt.mjs
+        env: { RUNNER_KEY: "${{ secrets.RUNNER_KEY }}", PAYLOAD: "${{ inputs.payload }}" }
+      - name: work
+        run: |
+          . /tmp/job.env
+          git config --global user.email agent@stitchnscale.local; git config --global user.name stitchnscale-agent
+          U="https://x-access-token:$GH@github.com/$REPO.git"
+          cd ~ && (git clone -q --depth 1 -b space "$U" space >/dev/null 2>&1 || (mkdir -p space && cd space && git init -q -b space && git remote add origin "$U"))
+          cd ~/space
+          (export GH= ; timeout 600 bash /tmp/job.sh) > /tmp/out.txt 2>&1; echo "EXIT=$?" >> /tmp/out.txt
+          find . -size +50M -not -path './.git/*' -delete || true
+          (git add -A && git commit -qm job && git push -q origin space) >/dev/null 2>&1 || true
+          if [ $(wc -c < /tmp/out.txt) -gt 8500 ]; then { head -c 3000 /tmp/out.txt; printf '\n...\n'; tail -c 5000 /tmp/out.txt; } > /tmp/o2.txt; else cp /tmp/out.txt /tmp/o2.txt; fi
+          OK=false; grep -q '^EXIT=0$' /tmp/out.txt && OK=true
+          jq -n --arg id "$JOB_ID" --rawfile t /tmp/o2.txt --argjson ok $OK '{job_id:$id, ok:$ok, final_url:"terminal", text:$t}' | curl -s -X POST "$CALLBACK_URL" -H 'content-type: application/json' -d @- >/dev/null
+          echo done

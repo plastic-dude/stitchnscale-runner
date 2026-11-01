@@ -1,0 +1,26 @@
+name: browse
+run-name: job
+on:
+  workflow_dispatch:
+    inputs:
+      payload: { required: true, type: string }
+permissions: { contents: read }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    container: mcr.microsoft.com/playwright:v1.64.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: decrypt
+        run: node decrypt.mjs
+        env: { RUNNER_KEY: "${{ secrets.RUNNER_KEY }}", PAYLOAD: "${{ inputs.payload }}" }
+      - name: work
+        env: { HOME: /root }
+        run: |
+          . /tmp/job.env
+          mkdir -p /tmp/w && cd /tmp/w
+          curl -sf -H "Authorization: Bearer $GH" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/$REPO/contents/worker.mjs" -o worker.mjs
+          npm init -y >/dev/null && npm i playwright@1.64.0 --no-audit --no-fund >/dev/null 2>&1
+          GH= node worker.mjs >/tmp/log.txt 2>&1 || true
+          echo done

@@ -13,3 +13,9 @@ fs.writeFileSync('/tmp/job.json', JSON.stringify(job), { mode: 0o600 });
 const sh = (v) => `'${String(v ?? '').replace(/'/g, `'\\''`)}'`;
 fs.writeFileSync('/tmp/job.env', [`export GH=${sh(job.gh)}`, `export REPO=${sh(job.repo)}`, `export JOB_ID=${sh(job.job_id)}`, `export CALLBACK_URL=${sh(job.cb)}`, `export STEPS=${sh(JSON.stringify(job.steps ?? []))}`, ...extra.map(([k, v]) => `export ${k}=${sh(v)}`)].join('\n'), { mode: 0o600 });
 if (job.script) fs.writeFileSync('/tmp/job.sh', job.script, { mode: 0o600 });
+// Browser jobs: saved logins (by name), a saved signed-in session, and workspace files to upload.
+for (const v of Object.values(job.secrets ?? {})) for (const line of String(v).split('\n')) if (line) console.log(`::add-mask::${line}`);
+fs.writeFileSync('/tmp/secrets.json', JSON.stringify(job.secrets ?? {}), { mode: 0o600 });
+if (job.storage) fs.writeFileSync('/tmp/storage.json', job.storage, { mode: 0o600 });
+if (job.session_name) fs.writeFileSync('/tmp/session_name', String(job.session_name).replace(/[^a-z0-9_.-]/gi, ''), { mode: 0o600 });
+fs.writeFileSync('/tmp/job.files', (job.files ?? []).map((f) => String(f).replace(/[^\w./-]/g, '').replace(/\.\.+/g, '.')).join('\n'), { mode: 0o600 });

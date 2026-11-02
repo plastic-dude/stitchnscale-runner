@@ -23,6 +23,10 @@ jobs:
           cd ~/space
           (export GH= ; timeout 600 bash /tmp/job.sh) > /tmp/out.txt 2>&1; echo "EXIT=$?" >> /tmp/out.txt
           find . -size +50M -not -path './.git/*' -delete || true
+          # keep clones as plain files: nested .git dirs become empty 'gitlinks' (content lost) and hold token-bearing remote URLs
+          git ls-files -s | awk '$1==160000{print $4}' | xargs -r git rm -q --cached >/dev/null 2>&1 || true
+          find . -mindepth 2 -name .git -prune -exec rm -rf {} + 2>/dev/null || true
+          find . -name node_modules -prune -not -path './.git/*' -exec rm -rf {} + 2>/dev/null || true
           (git add -A && git commit -qm job && git push -q origin space) >/dev/null 2>&1 || true
           if [ $(wc -c < /tmp/out.txt) -gt 8500 ]; then { head -c 3000 /tmp/out.txt; printf '\n...\n'; tail -c 5000 /tmp/out.txt; } > /tmp/o2.txt; else cp /tmp/out.txt /tmp/o2.txt; fi
           OK=false; grep -q '^EXIT=0$' /tmp/out.txt && OK=true

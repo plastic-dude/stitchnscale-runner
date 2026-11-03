@@ -16,6 +16,8 @@ jobs:
         env: { RUNNER_KEY: "${{ secrets.RUNNER_KEY }}", PAYLOAD: "${{ inputs.payload }}" }
       - name: work
         run: |
+          # No errexit: a job that fails (e.g. exit 127) must still reach the callback, or the bot waits 20 min for nothing.
+          set +e
           . /tmp/job.env
           git config --global user.email agent@stitchnscale.local; git config --global user.name stitchnscale-agent
           U="https://x-access-token:$GH@github.com/$REPO.git"

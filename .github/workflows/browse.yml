@@ -22,6 +22,7 @@ jobs:
           mkdir -p /tmp/w && cd /tmp/w
           curl -sf -H "Authorization: Bearer $GH" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/$REPO/contents/worker.mjs" -o worker.mjs
           mkdir -p files && while read -r f; do [ -n "$f" ] && curl -sf -H "Authorization: Bearer $GH" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/$REPO/contents/$f?ref=space" -o "files/$(basename "$f")"; done < /tmp/job.files || true
+          rm -f /tmp/job.env /tmp/job.json   # token no longer needed; the worker reads only its own files
           npm init -y >/dev/null && npm i playwright@1.64.0 --no-audit --no-fund >/dev/null 2>&1
           GH= node worker.mjs >/tmp/log.txt 2>&1 || true
           echo done

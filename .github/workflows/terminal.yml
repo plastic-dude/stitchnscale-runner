@@ -19,10 +19,13 @@ jobs:
           # No errexit: a job that fails (e.g. exit 127) must still reach the callback, or the bot waits 20 min for nothing.
           set +e
           . /tmp/job.env
+          # The job script must never see the workspace token: drop the files that hold it (values are already in env).
+          rm -f /tmp/job.env /tmp/job.json
           git config --global user.email agent@stitchnscale.local; git config --global user.name stitchnscale-agent
           U="https://x-access-token:$GH@github.com/$REPO.git"
           cd ~ && (git clone -q --depth 1 -b space "$U" space >/dev/null 2>&1 || (mkdir -p space && cd space && git init -q -b space && git remote add origin "$U"))
           cd ~/space
+          git remote set-url origin "https://github.com/$REPO.git"   # no token in .git/config while the job runs
           (export GH= ; timeout 600 bash /tmp/job.sh) > /tmp/out.txt 2>&1; echo "EXIT=$?" >> /tmp/out.txt
           find . -size +50M -not -path './.git/*' -delete || true
           # keep clones as plain files: nested .git dirs become empty 'gitlinks' (content lost) and hold token-bearing remote URLs
@@ -30,6 +33,7 @@ jobs:
           find . -mindepth 2 -name .git -prune -exec rm -rf {} + 2>/dev/null || true
           find . -name node_modules -prune -not -path './.git/*' -exec rm -rf {} + 2>/dev/null || true
           git add -A >/dev/null 2>&1; F=$(git diff --cached --name-only | head -20); if [ -n "$F" ]; then printf '\nFILES CREATED OR CHANGED (send with send_file):\n%s\n' "$F" >> /tmp/out.txt; fi
+          git remote set-url origin "$U"
           if [ -n "$F" ]; then git commit -qm job >/dev/null 2>&1; { git push -q origin space || { git pull -q --rebase origin space && git push -q origin space; }; } > /tmp/push.txt 2>&1 || { echo "WORKSPACE SAVE FAILED:"; sed "s/$GH/***/g" /tmp/push.txt | tail -5; } >> /tmp/out.txt; fi
           if [ $(wc -c < /tmp/out.txt) -gt 8500 ]; then { head -c 3000 /tmp/out.txt; printf '\n...\n'; tail -c 5000 /tmp/out.txt; } > /tmp/o2.txt; else cp /tmp/out.txt /tmp/o2.txt; fi
           OK=false; grep -q '^EXIT=0$' /tmp/out.txt && OK=true
